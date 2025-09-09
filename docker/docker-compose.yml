@@ -10,6 +10,11 @@ services:
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_log:/var/lib/zookeeper/log
+    healthcheck:  # Thêm healthcheck cho Zookeeper
+      test: ["CMD", "echo", "ruok", "|", "nc", "-w", "2", "localhost", "2181", "|", "grep", "imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
@@ -33,27 +38,47 @@ services:
       - "9000:9000"
     volumes:
       - ./pinot:/var/pinot/data
-      - pinot_data:/var/pinot/data/persistent  # Giữ volume cho dữ liệu lâu dài
+      - pinot_data:/var/pinot/data/persistent
+    depends_on:
+      - zookeeper
+    healthcheck:  # Thêm healthcheck cho controller
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s  # Chờ 60s để controller khởi tạo cluster
   pinot-server:
     image: apachepinot/pinot:1.0.0
     container_name: pinot-server
     command: ["StartServer", "-zkAddress", "zookeeper:2181"]
     volumes:
-      - ./pinot:/var/pinot/data  # Mount thư mục docker/pinot
-      - pinot_data:/var/pinot/data/persistent  # Giữ volume cho dữ liệu lâu dài
+      - ./pinot:/var/pinot/data
+      - pinot_data:/var/pinot/data/persistent 
+    ports:
+      - "8098:8098" # monitor prometheus
+    depends_on:
+      pinot-controller:
+        condition: service_healthy
+        
   pinot-broker:
     image: apachepinot/pinot:1.0.0
     container_name: pinot-broker
     command: ["StartBroker", "-zkAddress", "zookeeper:2181"]
     ports:
       - "8099:8099"
+    depends_on:
+      pinot-controller:
+        condition: service_healthy  # Chờ controller healthy
 
   pinot-minion:
     image: apachepinot/pinot:1.2.0
     container_name: pinot-minion
     command: ["StartMinion", "-zkAddress", "zookeeper:2181", "-clusterName", "PinotCluster"]
     depends_on:
-      - pinot-controller
+      pinot-controller:
+        condition: service_healthy
+    ports:
+      - "8097:8097"
     environment:
       JAVA_OPTS: "-Xms512M -Xmx2G"
 

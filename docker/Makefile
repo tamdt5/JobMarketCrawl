@@ -9,7 +9,7 @@ reset:
 .PHONY: start-consume
 start-consume:
 	@echo "Start Consume... (default: crawl_res)"
-	@docker exec docker-kafka-1 kafka-console-consumer --bootstrap-server localhost:9092 --topic crawl_res --from-beginning
+	@docker exec docker-kafka-1 kafka-console-consumer --bootstrap-server kafka:9092 --topic crawl_res --from-beginning
 	@echo "Done!"
 
 .PHONY: list-topic
@@ -39,9 +39,17 @@ delete-topic:
 	@docker exec docker-kafka-1 kafka-topics --delete --topic $(TOPIC) --bootstrap-server kafka:9092
 	@echo "Done!";
 
+PHONY: remove-migration
+remove-migration:
+	@echo "Remove old migrate" 
+	@docker exec pinot-controller bin/pinot-admin.sh DeleteTable -tableName crawl_res -exec 
+	 docker exec pinot-controller bin/pinot-admin.sh DeleteSchema -schemaName crawl_res -exec 
+	@echo "Done!"
+
 # hardcode: /var/pinot/data/schema.json
 PHONY: migrate 
 migrate:
+	@make remove-migration
 	@echo "Migration..."
 	@docker exec -it pinot-controller \
 		bin/pinot-admin.sh AddTable \
@@ -50,33 +58,6 @@ migrate:
 		-controllerHost localhost \
 		-controllerPort 9000 \
 		-exec
-	@echo "Done!";
-
-PHONY: delete-table 
-delete-table:
-	@echo "Delete table..."
-	@docker exec -it pinot-controller bin/pinot-admin.sh DeleteTable -tableName crawl_res -type REALTIME -exec
-	 docker exec -it pinot-controller bin/pinot-admin.sh DeleteTable -tableName crawl_res -type OFFLINE -exec
-	@echo "Done!";
-
-PHONY: get-schema
-get-schema:
-	@if [ -z "$(SCHEMA)" ]; then \
-		echo "Error: SCHEMA not specified."; \
-		exit 1; \
-	fi
-	@echo "Ready..."
-	@curl -X GET http://192.168.97.3:9000/schemas/$(SCHEMA)
-	@echo "Done!";
-
-PHONY: delete-schema
-delete-schema:
-	@if [ -z "$(SCHEMA)" ]; then \
-		echo "Error: SCHEMA not specified."; \
-		exit 1; \
-	fi
-	@echo "Deleting PINOT Schema $(SCHEMA)..."
-	@docker exec pinot-controller bin/pinot-admin.sh DeleteSchema -schemaName $(SCHEMA) -exec
-	@echo "Done!";
+	@echo "Done!"
 
 # reset -> start-consume -> create-topic (if not exist) -> migrate
