@@ -1,0 +1,27 @@
+{
+  "tableName": "job_postings",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "timeColumnName": "timestamp_iso",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "7",
+    "replicasPerPartition": "1"
+  },
+  "tableIndexConfig": {
+    "invertedIndexColumns": ["region", "category", "salary_tier"]
+  },
+  "ingestionConfig": {
+    "streamIngestionConfig": {
+      "streamConfigMaps": [{
+        "streamType": "kafka",
+        "stream.kafka.topic.name": "cleansed_job_postings",
+        "stream.kafka.broker.list": "kafka:9092",
+        "stream.kafka.consumer.type": "lowlevel",
+        "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+        "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder"
+      }]
+    }
+  },
+  "metadata": {},
+  "schemaName": "job_postings"
+}
