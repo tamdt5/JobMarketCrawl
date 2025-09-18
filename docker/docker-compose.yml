@@ -18,9 +18,11 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
     ports:
-      - "9092:9092"     # cho các container trong docker network
-      - "29092:29092"   # cho client chạy ngoài docker (Python, etc.)
+      - "9092:9092"
+      - "29092:29092"
+      - "9999:9999"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -29,6 +31,35 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_JMX_PORT: 9999
+      KAFKA_JMX_HOSTNAME: 0.0.0.0
+      KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false"
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--list", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka-jmx-exporter:
+    image: solsson/kafka-prometheus-jmx-exporter:latest
+    container_name: kafka-jmx-exporter
+    platform: linux/amd64  # Hỗ trợ emulation trên arm64
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./jmx-exporter-config.yml:/etc/jmx_exporter/config.yml:ro
+    command: ["8080", "/etc/jmx_exporter/config.yml", "service:jmx:rmi:///jndi/rmi://kafka:9999/jmxrmi"]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   pinot-controller:
     image: apachepinot/pinot:1.0.0
@@ -47,6 +78,7 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s  # Chờ 60s để controller khởi tạo cluster
+
   pinot-server:
     image: apachepinot/pinot:1.0.0
     container_name: pinot-server
