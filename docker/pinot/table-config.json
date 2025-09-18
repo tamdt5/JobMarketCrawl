@@ -4,8 +4,10 @@
   "segmentsConfig": {
     "timeColumnName": "timestamp_iso",
     "retentionTimeUnit": "DAYS",
-    "retentionTimeValue": "7",
-    "replicasPerPartition": "1"
+    "retentionTimeValue": "30",
+    "replicasPerPartition": "1",
+    "segmentPushType": "APPEND",
+    "segmentAssignmentStrategy": "BalanceNumSegmentAssignmentStrategy"
   },
   "tenants": {},
   "ingestionConfig": {

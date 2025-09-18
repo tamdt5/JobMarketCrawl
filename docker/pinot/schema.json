@@ -40,7 +40,19 @@
       "name": "timestamp_iso",
       "dataType": "LONG",
       "format": "1:MILLISECONDS:EPOCH",
-      "granularity": "1:HOURS"
+      "granularity": "1:MINUTES"
+    },
+    {
+      "name": "list_time_processed",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MINUTES"
+    },
+    {
+      "name": "processing_timestamp",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:MINUTES"
     }
   ]
 }

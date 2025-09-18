@@ -1,0 +1,70 @@
+# Job Market Real-time Analytics with Apache Pinot
+
+## Overview
+
+This project demonstrates a real-time analytics pipeline for Vietnam job market data, using [ViecLamTot.com](https://www.vieclamtot.com/) as the data source. It leverages Apache Pinot for ultra low-latency analytics, Kafka for streaming ingestion, and Python for crawling, ingestion, and visualization.
+
+## Architecture
+
+- **Crawling:** [`crawlproject/vieclamtot_spider.py`](crawlproject/vieclamtot_spider.py) scrapes job data and exports to CSV/JSON.
+- **Kafka Ingestion:** [`crawlproject/ingest_csv_to_kafka.py`](crawlproject/ingest_csv_to_kafka.py) pushes job data to Kafka topic `crawl_res`.
+- **Pinot Table & Schema:** Defined in [`docker/pinot/schema.json`](docker/pinot/schema.json) and [`docker/pinot/table-config.json`](docker/pinot/table-config.json).
+- **Docker Compose:** [`docker/docker-compose.yml`](docker/docker-compose.yml) orchestrates Pinot, Kafka, and supporting services.
+- **Analytics Notebook:** [`docker/Guideline.ipynb`](docker/Guideline.ipynb) runs queries, visualizes results, and benchmarks Pinot performance.
+
+## Quick Start
+Or follow step by step from Makefile(Mac/Linux)
+
+1. **Start Services**
+   ```sh
+   cd docker
+   docker-compose down
+   docker-compose up -d
+   ```
+
+2. **Scrape Job Data**
+   ```sh
+   cd crawlproject
+   python vieclamtot_spider.py
+   ```
+
+3. **Ingest Data to Kafka**
+   ```sh
+   python ingest_csv_to_kafka.py
+   ```
+
+4. **Migrate Pinot Table/Schema**
+   ```sh
+   docker exec pinot-controller bin/pinot-admin.sh DeleteTable -tableName crawl_res -exec 
+	docker exec pinot-controller bin/pinot-admin.sh DeleteSchema -schemaName crawl_res -exec 
+   ```
+
+5. **Migrate Pinot Table/Schema**
+   ```sh
+   docker exec pinot-controller bin/pinot-admin.sh DeleteTable -tableName crawl_res -exec 
+	docker exec pinot-controller bin/pinot-admin.sh DeleteSchema -schemaName crawl_res -exec 
+   ```
+
+6. **Run Analytics Notebook**
+   - Open [`docker/Guideline.ipynb`](docker/Guideline.ipynb) in Jupyter or VS Code.
+   - Execute cells to analyze, visualize, and benchmark.
+
+## Main Files
+
+- [crawlproject/vieclamtot_spider.py](crawlproject/vieclamtot_spider.py): Scraper for ViecLamTot jobs.
+- [crawlproject/ingest_csv_to_kafka.py](crawlproject/ingest_csv_to_kafka.py): CSV to Kafka ingestion.
+- [docker/pinot/schema.json](docker/pinot/schema.json): Pinot schema definition.
+- [docker/pinot/table-config.json](docker/pinot/table-config.json): Pinot table config.
+- [docker/Guideline.ipynb](docker/Guideline.ipynb): Analytics and visualization notebook.
+- [docker/Makefile](docker/Makefile): Helper commands for Kafka/Pinot.
+
+## Features
+
+- Real-time ingestion: Data flows from web → Kafka → Pinot in seconds.
+- Low-latency analytics: SQL queries return in milliseconds.
+- Scalable architecture: Easily scale Pinot and Kafka nodes.
+- Developer-friendly: SQL, REST API, and Python integration.
+
+## Benchmark
+
+See [`docker/Guideline.ipynb`](docker/Guideline.ipynb) for query performance results and visualizations.
