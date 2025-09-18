@@ -1,0 +1,5 @@
+pandas
+kafka-python
+requests
+tqdm
+python-dateutil

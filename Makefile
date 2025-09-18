@@ -1,3 +1,8 @@
+.PHONY: install
+install:
+	@echo "Installing python dependencies..."
+	@pip install -r requirements.txt
+
 .PHONY: reset start-consume create-topic delete-topic remove-migration migrate process-stream setup crawl ingest
 
 # Dừng và khởi động lại toàn bộ hệ thống
@@ -62,22 +67,24 @@ migrate: remove-migration
 # Chạy job Spark Streaming để xử lý dữ liệu
 process-stream:
 	@echo "Submitting Spark streaming job..."
-	@docker exec --env HADOOP_USER_NAME=root spark-master spark-submit \
+	@docker exec \
+		--user sparkuser \
+		--env HADOOP_USER_NAME=sparkuser \
+		spark-master spark-submit \
 		--master spark://spark-master:7077 \
-		--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
 		--conf spark.jars.ivy=/tmp/ivy \
 		/opt/bitnami/spark/scripts/process_with_spark.py
 
 # Chạy script crawl dữ liệu
 crawl:
 	@echo "Crawling data from vieclamtot.com..."
-	@python3 scripts/crawl_data.py
+	@python scripts/crawl_data.py
 	@echo "✅ Crawling complete!"
 
 # Chạy script ingest dữ liệu vào Kafka
 ingest:
 	@echo "Ingesting data to Kafka topic 'raw_job_postings'..."
-	@python3 scripts/ingest_to_kafka.py
+	@python scripts/ingest_to_kafka.py
 	@echo "✅ Ingestion complete!"
 
 .PHONY: deep-clean

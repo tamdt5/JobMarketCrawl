@@ -7,6 +7,10 @@
     "retentionTimeValue": "7",
     "replicasPerPartition": "1"
   },
+  "tenants": {
+    "broker": "DefaultTenant_BROKER",
+    "server": "DefaultTenant_REALTIME"
+  },
   "tableIndexConfig": {
     "invertedIndexColumns": ["region", "category", "salary_tier"]
   },

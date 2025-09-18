@@ -48,7 +48,7 @@ if __name__ == "__main__":
     jobs = scrape_jobs(total=5000, limit=50)
 
     # Path to the data directory, relative to this script's location
-    DATA_DIR = '../data'
+    DATA_DIR = 'data'
     
     # Create data directory if it doesn't exist
     if not os.path.exists(DATA_DIR):
