@@ -3,11 +3,14 @@ import pandas as pd
 import json
 from datetime import datetime
 from tqdm import tqdm
+import os
+import glob
+import concurrent.futures
 
 # Thêm thư viện để phân tích cú pháp ngày tháng
 from dateutil import parser
 
-path_data = 'data/jobs.csv'
+DATA_DIR = 'data'
 
 producer = KafkaProducer(
     bootstrap_servers=['localhost:29092'],
@@ -18,42 +21,59 @@ producer = KafkaProducer(
 # Hàm trợ giúp để chuyển đổi ISO string sang epoch milliseconds
 def iso_to_epoch_ms(iso_str):
     if pd.isna(iso_str):
-        return int(datetime.utcnow().timestamp() * 1000) # Fallback nếu dữ liệu rỗng
+        return int(datetime.utcnow().timestamp() * 1000)
     try:
-        # Phân tích cú pháp chuỗi ISO 8601
         dt_obj = parser.isoparse(iso_str)
-        # Chuyển đổi thành epoch milliseconds
         return int(dt_obj.timestamp() * 1000)
     except (ValueError, TypeError):
-        # Fallback nếu định dạng không hợp lệ
         return int(datetime.utcnow().timestamp() * 1000)
 
-try:
-    df = pd.read_csv(path_data)
-    print(f"Reading data from {path_data}...")
+def process_file(file_path):
+    """Đọc và đẩy dữ liệu từ một file CSV vào Kafka."""
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Reading data from {file_path}...")
 
-    # Sử dụng tqdm để tạo thanh tiến trình
-    for index, row in tqdm(df.iterrows(), total=df.shape[0], desc="Sending to Kafka"):
-        record = row.to_dict()
-        record = {k: None if pd.isna(v) else v for k, v in record.items()}
+        futures = []
+        for index, row in tqdm(df.iterrows(), total=df.shape[0], desc=f"Sending {file_path} to Kafka"):
+            record = row.to_dict()
+            record = {k: None if pd.isna(v) else v for k, v in record.items()}
+            original_iso_timestamp = record.get("timestamp_iso")
+            record["timestamp_iso"] = iso_to_epoch_ms(original_iso_timestamp)
+            message_key = record.get('list_id')
+            future = producer.send('raw_job_postings', key=message_key, value=record)
+            futures.append(future)
 
-        # === FIX CORE LOGIC HERE ===
-        # Chuyển đổi timestamp_iso gốc thay vì ghi đè nó
-        original_iso_timestamp = record.get("timestamp_iso")
-        record["timestamp_iso"] = iso_to_epoch_ms(original_iso_timestamp)
-        # ===========================
+        # Đợi tất cả message được gửi
+        for future in futures:
+            future.get(timeout=10)  # Chờ tối đa 10 giây mỗi message
+        print(f"All data from {file_path} sent to Kafka topic 'raw_job_postings'!")
+        return True
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return False
+    except Exception as e:
+        print(f"Error processing {file_path}: {e}")
+        return False
 
-        message_key = record.get('list_id')
-        producer.send('raw_job_postings', key=message_key, value=record)
+def ingest_to_kafka():
+    """Đọc tất cả file CSV trong thư mục data và đẩy bất đồng bộ."""
+    csv_files = glob.glob(os.path.join(DATA_DIR, 'jobs_*.csv'))
+    if not csv_files:
+        print(f"No CSV files found in {DATA_DIR}. Please run 'make crawl' first.")
+        return
 
-    producer.flush()
-    print("\nAll data has been sent to Kafka topic 'raw_job_postings'!")
+    print(f"Found {len(csv_files)} CSV files: {csv_files}")
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = [executor.submit(process_file, csv_file) for csv_file in csv_files]
+        concurrent.futures.wait(futures)  # Chờ tất cả file được xử lý
 
-except FileNotFoundError:
-    print(f"Error: Data file not found at {path_data}")
-    print("Please run 'make crawl' first.")
-except Exception as e:
-    print(f"An error occurred: {e}")
-finally:
-    print("Closing Kafka producer...")
-    producer.close()
+if __name__ == "__main__":
+    try:
+        ingest_to_kafka()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        print("Closing Kafka producer...")
+        producer.flush()
+        producer.close()

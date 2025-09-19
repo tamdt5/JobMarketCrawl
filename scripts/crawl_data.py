@@ -20,14 +20,21 @@ def convert_timestamp_to_iso(timestamp_ms):
 
 def scrape_jobs(total=5000, limit=50):
     results = []
-    pages = total // limit + 1
+    pages = (total // limit) + 1
+    file_counter = 1
+    records_per_file = 1000  # Mỗi file chứa tối đa 1000 bản ghi
+
+    # Tạo thư mục data nếu chưa tồn tại
+    DATA_DIR = 'data'
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
 
     for page in range(1, pages + 1):
         params = {"page": page, "limit": limit, "cg": "13010"}
         print(f"Fetching page {page}/{pages} ...")
         try:
             r = requests.get(BASE_LIST_URL, headers=HEADERS, params=params, timeout=10)
-            r.raise_for_status()  # Raise an exception for bad status codes
+            r.raise_for_status()
             ads = r.json().get("ads", [])
             if not ads:
                 print("No more ads, stopping.")
@@ -35,32 +42,39 @@ def scrape_jobs(total=5000, limit=50):
             for ad in ads:
                 ad["timestamp_iso"] = convert_timestamp_to_iso(ad.get("list_time"))
                 results.append(ad)
-            if len(results) >= total:
+
+                # Khi đủ 50 bản ghi, lưu vào file
+                if len(results) >= records_per_file:
+                    df = pd.DataFrame(results)
+                    file_index = f"{file_counter:03d}"  # Định dạng 001, 002, ...
+                    csv_path = os.path.join(DATA_DIR, f'jobs_{file_index}.csv')
+                    json_path = os.path.join(DATA_DIR, f'jobs_{file_index}.json')
+                    df.to_csv(csv_path, index=False, encoding="utf-8-sig")
+                    df.to_json(json_path, orient="records", force_ascii=False)
+                    print(f"Saved {len(df)} jobs to {csv_path} and {json_path}")
+                    results = []  # Reset danh sách
+                    file_counter += 1
+
+            if len(results) + (page * limit) >= total:
                 break
             time.sleep(1)
         except requests.exceptions.RequestException as e:
             print(f"Failed page {page}, error: {e}")
             continue
-    return results
+
+    # Lưu các bản ghi còn lại (nếu có)
+    if results:
+        df = pd.DataFrame(results)
+        file_index = f"{file_counter:03d}"
+        csv_path = os.path.join(DATA_DIR, f'jobs_{file_index}.csv')
+        json_path = os.path.join(DATA_DIR, f'jobs_{file_index}.json')
+        df.to_csv(csv_path, index=False, encoding="utf-8-sig")
+        df.to_json(json_path, orient="records", force_ascii=False)
+        print(f"Saved {len(df)} jobs to {csv_path} and {json_path}")
+
+    return file_counter
 
 # === Main execution ===
 if __name__ == "__main__":
-    jobs = scrape_jobs(total=5000, limit=50)
-
-    # Path to the data directory, relative to this script's location
-    DATA_DIR = 'data'
-    
-    # Create data directory if it doesn't exist
-    if not os.path.exists(DATA_DIR):
-        os.makedirs(DATA_DIR)
-
-    df = pd.DataFrame(jobs)
-    
-    # Update paths to save files in the data directory
-    csv_path = os.path.join(DATA_DIR, 'jobs.csv')
-    json_path = os.path.join(DATA_DIR, 'jobs.json')
-    
-    df.to_csv(csv_path, index=False, encoding="utf-8-sig")
-    df.to_json(json_path, orient="records", force_ascii=False)
-
-    print(f"\nScraped {len(df)} jobs and saved to {csv_path} and {json_path}")
+    total_files = scrape_jobs(total=5000, limit=50)
+    print(f"\nScraped and saved {total_files} files in data directory.")

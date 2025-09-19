@@ -3,3 +3,4 @@ kafka-python
 requests
 tqdm
 python-dateutil
+pyspark==3.5.6

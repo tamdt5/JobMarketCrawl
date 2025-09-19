@@ -5,14 +5,17 @@
     "timeColumnName": "timestamp_iso",
     "retentionTimeUnit": "DAYS",
     "retentionTimeValue": "7",
-    "replicasPerPartition": "1"
+    "replication": "1",
+    "schemaName": "job_postings"
   },
   "tenants": {
-    "broker": "DefaultTenant_BROKER",
-    "server": "DefaultTenant_REALTIME"
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
   },
   "tableIndexConfig": {
-    "invertedIndexColumns": ["region", "category", "salary_tier"]
+    "invertedIndexColumns": ["region", "category", "salary_tier"],
+    "loadMode": "MMAP",
+    "lazyLoad": "false"
   },
   "ingestionConfig": {
     "streamIngestionConfig": {
@@ -22,10 +25,14 @@
         "stream.kafka.broker.list": "kafka:9092",
         "stream.kafka.consumer.type": "lowlevel",
         "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
-        "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder"
+        "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder",
+        "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+        "realtime.segment.flush.threshold.rows": "50000",
+        "realtime.segment.flush.threshold.time": "3600000"
       }]
     }
   },
-  "metadata": {},
-  "schemaName": "job_postings"
+  "metadata": {
+    "customConfigs": {}
+  }
 }
