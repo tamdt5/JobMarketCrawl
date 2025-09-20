@@ -131,6 +131,7 @@ build-spark:
 
 # Chạy job Spark Streaming để xử lý dữ liệu
 process-stream:
+	@make build-spark
 	@echo "Waiting for Spark worker to be ready..."
 	@timeout=60; \
 	while [ $$timeout -gt 0 ]; do \
