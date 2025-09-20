@@ -81,8 +81,8 @@ services:
       - "8080:8080"
       - "7077:7077"
     volumes:
-      - ../scripts:/opt/bitnami/spark/scripts
-      - ../spark/checkpoints:/tmp/spark_checkpoints
+      - ./scripts:/opt/bitnami/spark/scripts
+      - ./spark/checkpoints:/tmp/spark_checkpoints
     environment:
       - SPARK_MODE=master
       - SPARK_RPC_AUTHENTICATION_ENABLED=no

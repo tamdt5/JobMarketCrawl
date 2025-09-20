@@ -41,15 +41,6 @@ reset:
 	@docker-compose -f infrastructure/docker-compose.yml up -d
 	@echo "Done!"
 
-# Build spark-master và spark-worker với --no-cache nếu chưa build
-build-spark:
-	@if docker images | grep -q "infrastructure-spark-master" && docker images | grep -q "infrastructure-spark-worker"; then \
-		echo "Spark images already exist, skipping build."; \
-	else \
-		echo "Building spark-master and spark-worker..."; \
-		docker-compose -f infrastructure/docker-compose.yml build --no-cache spark-master spark-worker | tee build.log; \
-		echo "Build complete. Log saved to build.log."; \
-	fi
 
 # Tạo một Kafka topic mới
 create-topic:
@@ -145,8 +136,27 @@ start-consume:
 
 ## Kết thúc COMMAND
 
+# Build spark-master và spark-worker với --no-cache nếu chưa build
+build-spark:
+	@if docker images | grep -q "infrastructure-spark-master" && docker images | grep -q "infrastructure-spark-worker"; then \
+		echo "Spark images already exist, skipping build."; \
+	else \
+		echo "Building spark-master and spark-worker..."; \
+		docker-compose -f infrastructure/docker-compose.yml build --no-cache spark-master spark-worker | tee build.log; \
+		echo "Build complete. Log saved to build.log."; \
+	fi
+
+# Clean checkpoint .tmp và kill Spark job cũ
+clean-checkpoint:
+	@echo "Cleaning up Spark checkpoint..."
+	# Kill process_with_spark.py if running
+	-docker exec spark-master bash -c "pkill -f process_with_spark.py || true"
+	# Remove .tmp files in checkpoint directory
+	-docker exec spark-master bash -c "find /opt/bitnami/spark/checkpoints/job_postings_stream/offsets -name '*.tmp' -delete"
+	@echo "Checkpoint cleanup done."
+
 # Chạy job Spark Streaming để xử lý dữ liệu
-process-stream: build-spark
+process-stream: build-spark clean-checkpoint
 	@echo "Waiting for Spark worker to be ready..."
 	@timeout=60; \
 	while [ $$timeout -gt 0 ]; do \
@@ -177,13 +187,13 @@ process-stream: build-spark
 # Chạy script crawl dữ liệu
 crawl:
 	@echo "Crawling data from vieclamtot.com..."
-	@$(PYTHON) scripts/crawl_data.py
+	@$(PYTHON) infrastructure/scripts/crawl_data.py
 	@echo "✅ Crawling complete! Saved multiple jobs_00x.csv and jobs_00x.json files."
 
 # Chạy script ingest dữ liệu vào Kafka
 ingest:
 	@echo "Ingesting data from all jobs_*.csv files to Kafka topic 'raw_job_postings'..."
-	@$(PYTHON) scripts/ingest_to_kafka.py
+	@$(PYTHON) infrastructure/scripts/ingest_to_kafka.py
 	@echo "✅ Ingestion complete!"
 
 .PHONY: deep-clean
