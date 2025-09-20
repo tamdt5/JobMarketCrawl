@@ -67,8 +67,8 @@ migrate: remove-migration
 	@echo "Applying Pinot schema and table configuration..."
 	@docker exec pinot-controller \
 		bin/pinot-admin.sh AddTable \
-		-tableConfigFile /var/pinot/data/table-config.json \
-		-schemaFile /var/pinot/data/schema.json \
+		-tableConfigFile /opt/pinot/controller/data/table-config.json \
+		-schemaFile /opt/pinot/controller/data/schema.json \
 		-controllerHost localhost \
 		-controllerPort 9000 \
 		-controllerProtocol http \
