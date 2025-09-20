@@ -8,7 +8,7 @@ services:
     ports:
       - 2181:2181
     healthcheck:
-      test: ["CMD", "echo", "ruok", "|", "nc", "-w", "2", "localhost", "2181", "|", "grep", "imok"]
+      test: ["CMD", "echo ruok | nc -w 2 localhost 2181 | grep imok"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -42,7 +42,7 @@ services:
     ports:
       - "9000:9000"
     volumes:
-      - ./pinot:/var/pinot/data
+      - ./pinot/controller:/opt/pinot/controller/data
     depends_on:
       - zookeeper
     healthcheck:
@@ -66,30 +66,11 @@ services:
     image: apachepinot/pinot:1.2.0
     container_name: pinot-server
     command: ["StartServer", "-zkAddress", "zookeeper:2181"]
+    volumes:
+      - ./pinot/server:/opt/pinot/server/data
     depends_on:
       pinot-controller:
         condition: service_healthy
-
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-    ports:
-      - 9090:9090
-    depends_on:
-      - pinot-controller
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: grafana
-    ports:
-      - 3000:3000
-    depends_on:
-      - prometheus
-    environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
 
   spark-master:
     build: ./spark
@@ -100,8 +81,8 @@ services:
       - "8080:8080"
       - "7077:7077"
     volumes:
-      - ../scripts:/opt/bitnami/spark/scripts
-      - spark-checkpoints:/tmp/spark_checkpoints
+      - ./scripts:/opt/bitnami/spark/scripts
+      - ./spark/checkpoints:/tmp/spark_checkpoints
     environment:
       - SPARK_MODE=master
       - SPARK_RPC_AUTHENTICATION_ENABLED=no
@@ -128,5 +109,21 @@ services:
       - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
       - SPARK_SSL_ENABLED=no
 
-volumes:
-  spark-checkpoints:
+  metabase:
+    image: metabase/metabase:v0.56.6
+    container_name: metabase
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./metabase/data:/metabase-data
+      - ./metabase/plugins:/plugins
+    environment:
+      - MB_DB_TYPE=h2
+      - MB_DB_FILE=/metabase-data/metabase.db
+      - MB_PLUGINS_DIR=/plugins
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s

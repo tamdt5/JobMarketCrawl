@@ -1,16 +1,31 @@
 # COMMAND cài đặt các package "make install" - Định nghĩa biến PYTHON để chọn python3 hoặc python
 PYTHON := $(shell command -v python3 >/dev/null 2>&1 && echo python3 || echo python)
 
-.PHONY: install
+.PHONY: install install-drivers reset start-consume list-topic create-topic delete-topic remove-migration migrate process-stream build-spark setup crawl ingest deep-clean
+
+## COMMAND cài đặt các package
 install:
 	@echo "Installing python dependencies..."
 	@pip install -r requirements.txt
 
-.PHONY: reset start-consume list-topic create-topic delete-topic remove-migration migrate process-stream setup crawl ingest
+install-drivers:
+	@echo "Installing Pinot JDBC driver for Metabase..."
+	@mkdir -p infrastructure/metabase/plugins
+	@if [ ! -f infrastructure/metabase/plugins/pinot.metabase-driver-v1.1.0.jar ]; then \
+		echo "Downloading pinot.metabase-driver-v1.1.0.jar..."; \
+		curl -L -o infrastructure/metabase/plugins/pinot.metabase-driver-v1.1.0.jar https://github.com/startreedata/metabase-pinot-driver/releases/download/v1.1.0/pinot.metabase-driver-v1.1.0.jar; \
+		if [ $$? -ne 0 ]; then \
+			echo "Failed to download pinot.metabase-driver-v1.1.0.jar"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "pinot.metabase-driver-v1.1.0.jar already exists, skipping download."; \
+	fi
+	@echo "Done!"
 
-## COMMNAD KHỞI TẠO: "make setup"
+## COMMAND KHỞI TẠO: "make setup"
 # Thiết lập toàn bộ hệ thống (tạo topic, migrate pinot)
-setup: reset
+setup: install-drivers reset
 	@echo "Waiting 30 seconds for all services to be healthy..."
 	@sleep 30
 	@make create-topic TOPIC=raw_job_postings
@@ -25,6 +40,16 @@ reset:
 	@echo "Starting containers..."
 	@docker-compose -f infrastructure/docker-compose.yml up -d
 	@echo "Done!"
+
+# Build spark-master và spark-worker với --no-cache nếu chưa build
+build-spark:
+	@if docker images | grep -q "infrastructure-spark-master" && docker images | grep -q "infrastructure-spark-worker"; then \
+		echo "Spark images already exist, skipping build."; \
+	else \
+		echo "Building spark-master and spark-worker..."; \
+		docker-compose -f infrastructure/docker-compose.yml build --no-cache spark-master spark-worker | tee build.log; \
+		echo "Build complete. Log saved to build.log."; \
+	fi
 
 # Tạo một Kafka topic mới
 create-topic:
@@ -100,7 +125,7 @@ remove-migration:
 # List topic hiện có trong Kafka
 list-topic:
 	@echo "Topic listing:..."
-	@docker exec kafka kafka-topics --list --bootstrap-server localhost:9092                                   
+	@docker exec kafka kafka-topics --list --bootstrap-server kafka:9092
 	@echo "Done!"
 
 # Xóa một Kafka topic
@@ -111,27 +136,17 @@ delete-topic:
 	fi
 	@echo "Deleting Kafka topic $(TOPIC)..."
 	@docker exec kafka kafka-topics --delete --topic $(TOPIC) --bootstrap-server kafka:9092
-	@echo "Done!";
+	@echo "Done!"
 
 # Xem dữ liệu đang chảy vào Kafka topic
 start-consume:
 	@echo "Start Consume... Usage: make start-consume TOPIC=<topic_name>"
 	@docker exec kafka kafka-console-consumer --bootstrap-server kafka:9092 --topic ${TOPIC} --from-beginning
+
 ## Kết thúc COMMAND
 
-# Build spark-master và spark-worker với --no-cache nếu chưa build
-build-spark:
-	@if docker images | grep -q "infrastructure-spark-master" && docker images | grep -q "infrastructure-spark-worker"; then \
-		echo "Spark images already exist, skipping build."; \
-	else \
-		echo "Building spark-master and spark-worker..."; \
-		docker-compose -f infrastructure/docker-compose.yml build --no-cache spark-master spark-worker | tee build.log; \
-		echo "Build complete. Log saved to build.log."; \
-	fi
-
 # Chạy job Spark Streaming để xử lý dữ liệu
-process-stream:
-	@make build-spark
+process-stream: build-spark
 	@echo "Waiting for Spark worker to be ready..."
 	@timeout=60; \
 	while [ $$timeout -gt 0 ]; do \
