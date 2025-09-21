@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*egg-info/
+.env
+
+# VSCode
+.vscode/
+
+# Data files
+data/
+
+# Docker persistent data
+infrastructure/pinot/persistent/

@@ -1,0 +1,23 @@
+{
+  "schemaName": "job_postings",
+  "dimensionFieldSpecs": [
+    {"name": "ad_id", "dataType": "STRING"},
+    {"name": "list_id", "dataType": "STRING"},
+    {"name": "subject", "dataType": "STRING"},
+    {"name": "company_name", "dataType": "STRING"},
+    {"name": "region", "dataType": "STRING"},
+    {"name": "category", "dataType": "STRING"},
+    {"name": "salary_tier", "dataType": "STRING"} 
+  ],
+  "metricFieldSpecs": [
+    {"name": "min_salary", "dataType": "FLOAT"},
+    {"name": "max_salary", "dataType": "FLOAT"},
+    {"name": "average_salary", "dataType": "DOUBLE"}
+  ],
+  "dateTimeFieldSpecs": [{
+      "name": "timestamp_iso",
+      "dataType": "LONG",
+      "format": "1:MILLISECONDS:EPOCH",
+      "granularity": "1:HOURS"
+  }]
+}
