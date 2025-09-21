@@ -6,6 +6,7 @@ from tqdm import tqdm
 import os
 import glob
 import concurrent.futures
+import platform
 
 # Thêm thư viện để phân tích cú pháp ngày tháng
 from dateutil import parser
@@ -57,16 +58,28 @@ def process_file(file_path):
         return False
 
 def ingest_to_kafka():
-    """Đọc tất cả file CSV trong thư mục data và đẩy bất đồng bộ."""
+    """Đọc tất cả file CSV trong thư mục data và đẩy lên Kafka."""
     csv_files = glob.glob(os.path.join(DATA_DIR, 'jobs_*.csv'))
     if not csv_files:
         print(f"No CSV files found in {DATA_DIR}. Please run 'make crawl' first.")
         return
 
     print(f"Found {len(csv_files)} CSV files: {csv_files}")
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        futures = [executor.submit(process_file, csv_file) for csv_file in csv_files]
-        concurrent.futures.wait(futures)  # Chờ tất cả file được xử lý
+    
+    system_name = platform.system()
+    print(f"Detected OS: {system_name}")
+
+    if system_name == "Windows":
+        # Windows: chạy tuần tự
+        print("Running in sequential mode (Windows detected)...")
+        for csv_file in csv_files:
+            process_file(csv_file)
+    else:
+        # Linux/Mac: chạy bất đồng bộ
+        print("Running in parallel mode (non-Windows detected)...")
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            futures = [executor.submit(process_file, csv_file) for csv_file in csv_files]
+            concurrent.futures.wait(futures)
 
 if __name__ == "__main__":
     try:
